@@ -325,13 +325,15 @@ mod impls {
     use std::collections::HashMap;
     use fallible_iterator::FallibleIterator;
     use byteorder::{ReadBytesExt, WriteBytesExt, BigEndian};
-    use diesel::types::impls::option::UnexpectedNullError;
+    use diesel::result::UnexpectedNullError;
     use diesel::Queryable;
     use diesel::expression::AsExpression;
     use diesel::expression::bound::Bound;
     use diesel::pg::Pg;
     use diesel::row::Row;
-    use diesel::types::*;
+    use diesel::sql_types::*;
+    use diesel::serialize::{Output, ToSql, IsNull};
+    use diesel::deserialize::{FromSqlRow, FromSql};
 
     use super::Hstore;
 
@@ -363,9 +365,7 @@ mod impls {
         fn from_sql(bytes: Option<&[u8]>) -> Result<Self, Box<StdError + Send + Sync>> {
             let mut buf = match bytes {
                 Some(bytes) => bytes,
-                None => return Err(Box::new(UnexpectedNullError {
-                    msg: "Unexpected null for non-null column".to_string(),
-                })),
+                None => return Err(Box::new(UnexpectedNullError)),
             };
             let count = buf.read_i32::<BigEndian>()?;
 
@@ -395,7 +395,7 @@ mod impls {
     }
 
     impl ToSql<Hstore, Pg> for Hstore {
-        fn to_sql<W>(&self, out: &mut ToSqlOutput<W, Pg>) -> Result<IsNull, Box<StdError + Send + Sync>>
+        fn to_sql<W>(&self, out: &mut Output<W, Pg>) -> Result<IsNull, Box<StdError + Send + Sync>>
             where W: Write
         {
             let mut buf: Vec<u8> = Vec::new();
